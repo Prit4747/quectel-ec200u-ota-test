@@ -1,0 +1,10 @@
+dependencies:
+  # UART PPPoS + AT command stack. Replaces iot_usbh_modem now that the
+  # EC200U-CN is wired over its UART header instead of USB -- see
+  # docs/WIRING.md and docs/MIGRATION_GUIDE.md for why.
+  espressif/esp_modem:
+    version: "^1.0"
+  espressif/esp_delta_ota:
+    version: "1.*"
+  idf:
+    version: ">=5.3.0"

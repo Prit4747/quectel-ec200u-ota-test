@@ -1,0 +1,24 @@
+idf_component_register(
+    SRCS
+        "main.cpp"
+        "modem.cpp"
+        "ppp_manager.cpp"
+        "web_server.cpp"
+        "ota_manager.cpp"
+    INCLUDE_DIRS "."
+    EMBED_FILES
+        "web_ui.html"
+    REQUIRES
+        esp_wifi
+        esp_http_server
+        esp_https_ota
+        esp_netif
+        esp_event
+        espressif__esp_modem
+        esp_delta_ota
+        nvs_flash
+        app_update
+        mbedtls
+        esp_app_format
+        driver
+)

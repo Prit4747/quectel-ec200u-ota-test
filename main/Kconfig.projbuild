@@ -1,0 +1,72 @@
+menu "Modem / Quectel EC200U-CN UART Configuration"
+
+    config MODEM_APN
+        string "SIM APN"
+        default "airtelgprs.com"
+        help
+            Carrier APN passed to esp_modem's DCE config.
+            Examples: airtelgprs.com, jionet, internet.
+
+    config MODEM_UART_PORT_NUM
+        int "UART port number"
+        default 1
+        range 0 2
+        help
+            ESP32-S3 UART controller to use for the modem link. Avoid
+            UART0 if it's your console/flashing port.
+
+    config MODEM_UART_TX_PIN
+        int "TXD GPIO (ESP32-S3 -> module Rx)"
+        default 17
+        range 0 48
+        help
+            ESP32-S3 GPIO wired to the module's UART Rx pin.
+
+    config MODEM_UART_RX_PIN
+        int "RXD GPIO (ESP32-S3 <- module Tx)"
+        default 18
+        range 0 48
+        help
+            ESP32-S3 GPIO wired to the module's UART Tx pin.
+
+    config MODEM_UART_RTS_PIN
+        int "RTS GPIO"
+        default 8
+        range -1 48
+        help
+            ESP32-S3 GPIO wired to the module's MAIN_RTS pin. Only
+            meaningful when flow control is set to HW below; set to -1
+            if you did not wire RTS/CTS.
+
+    config MODEM_UART_CTS_PIN
+        int "CTS GPIO"
+        default 9
+        range -1 48
+        help
+            ESP32-S3 GPIO wired to the module's MAIN_CTS pin. Only
+            meaningful when flow control is set to HW below; set to -1
+            if you did not wire RTS/CTS.
+
+    config MODEM_UART_BAUD_RATE
+        int "UART baud rate"
+        default 115200
+        help
+            Datasheet default is 115200 bps with no flow control -- the
+            safest starting point. The module supports up to 921600 bps,
+            but only with HW flow control (RTS/CTS wired) enabled below.
+
+    choice MODEM_FLOW_CONTROL
+        prompt "UART flow control"
+        default MODEM_FLOW_CONTROL_NONE
+        help
+            Datasheet: "Support MAIN_RTS & MAIN_CTS Hw flow control".
+            Leave at NONE unless you've wired RTS/CTS and are pushing the
+            baud rate up.
+
+        config MODEM_FLOW_CONTROL_NONE
+            bool "None"
+        config MODEM_FLOW_CONTROL_HW
+            bool "Hardware (RTS/CTS)"
+    endchoice
+
+endmenu
