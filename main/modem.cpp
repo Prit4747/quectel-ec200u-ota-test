@@ -75,6 +75,15 @@ esp_err_t modem_install(const char *apn)
     }
 
     esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
+    /* Default task_priority (5) ties with ota_task's priority (see
+     * ota_manager.cpp) -- under sustained OTA load (TLS decrypt + flash
+     * writes), that starves the UART driver task long enough for the
+     * 128-byte hardware FIFO to overflow before anything drains it,
+     * corrupting PPP/AT traffic mid-transfer. Raise it well above
+     * ota_task and other app-level tasks, but still below WiFi's
+     * priority (23) and other system-critical tasks. */
+    dte_config.task_priority = 15;
+    dte_config.uart_config.rx_buffer_size = 8192;
     dte_config.uart_config.port_num = (uart_port_t)MODEM_UART_PORT_NUM;
     dte_config.uart_config.tx_io_num = MODEM_UART_TX_GPIO;
     dte_config.uart_config.rx_io_num = MODEM_UART_RX_GPIO;
