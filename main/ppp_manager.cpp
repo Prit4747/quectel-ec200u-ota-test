@@ -55,13 +55,20 @@ static void apply_got_ip(esp_netif_t *nif, const esp_netif_ip_info_t *ip_info)
 {
     ESP_LOGI(TAG, "PPP GOT_IP  " IPSTR, IP2STR(&ip_info->ip));
 
+    /* Always force a known-good public resolver, rather than only
+     * falling back to one when the carrier didn't provide any DNS
+     * server at all. Some carrier-provided DNS servers resolve common
+     * sites fine but are flaky/unreliable for others (e.g. GitHub's
+     * release CDN) -- OTA URLs need a resolver that Just Works. */
     esp_netif_dns_info_t dns_main = {0};
-    if (esp_netif_get_dns_info(nif, ESP_NETIF_DNS_MAIN, &dns_main) != ESP_OK
-        || ip4_addr_isany_val(dns_main.ip.u_addr.ip4)) {
-        IP4_ADDR(&dns_main.ip.u_addr.ip4, 8, 8, 8, 8);
-        dns_main.ip.type = ESP_IPADDR_TYPE_V4;
-        esp_netif_set_dns_info(nif, ESP_NETIF_DNS_MAIN, &dns_main);
-    }
+    dns_main.ip.type = ESP_IPADDR_TYPE_V4;
+    IP4_ADDR(&dns_main.ip.u_addr.ip4, 8, 8, 8, 8);
+    esp_netif_set_dns_info(nif, ESP_NETIF_DNS_MAIN, &dns_main);
+
+    esp_netif_dns_info_t dns_backup = {0};
+    dns_backup.ip.type = ESP_IPADDR_TYPE_V4;
+    IP4_ADDR(&dns_backup.ip.u_addr.ip4, 8, 8, 4, 4);
+    esp_netif_set_dns_info(nif, ESP_NETIF_DNS_BACKUP, &dns_backup);
 
     esp_netif_set_default_netif(nif);
     s_connected = true;
