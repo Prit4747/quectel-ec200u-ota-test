@@ -30,43 +30,53 @@ menu "Modem / Quectel EC200U-CN UART Configuration"
             ESP32-S3 GPIO wired to the module's UART Tx pin.
 
     config MODEM_UART_RTS_PIN
-        int "RTS GPIO"
+        int "RTS GPIO (unused on Vanix TracX-1b)"
         default 8
         range -1 48
         help
-            ESP32-S3 GPIO wired to the module's MAIN_RTS pin. Only
-            meaningful when flow control is set to HW below; set to -1
-            if you did not wire RTS/CTS.
+            The EC200U-CN chip itself supports HW flow control, but the
+            Vanix TracX-1b carrier board's Communications Pins header
+            does not break out MAIN_RTS/MAIN_CTS (see datasheet Table 3
+            -- UART Pins lists only Tx/Rx/GND). This setting has no
+            physical pin to connect to on this board and is unused
+            while flow control stays at None below.
 
     config MODEM_UART_CTS_PIN
-        int "CTS GPIO"
+        int "CTS GPIO (unused on Vanix TracX-1b)"
         default 9
         range -1 48
         help
-            ESP32-S3 GPIO wired to the module's MAIN_CTS pin. Only
-            meaningful when flow control is set to HW below; set to -1
-            if you did not wire RTS/CTS.
+            See MODEM_UART_RTS_PIN -- not physically available on this
+            carrier board.
 
     config MODEM_UART_BAUD_RATE
         int "UART baud rate"
-        default 115200
+        default 230400
         help
-            Datasheet default is 115200 bps with no flow control -- the
-            safest starting point. The module supports up to 921600 bps,
-            but only with HW flow control (RTS/CTS wired) enabled below.
+            Datasheet default is 115200 bps. Since this carrier board
+            doesn't expose MAIN_RTS/MAIN_CTS (HW flow control is not an
+            option here), raising this trades some reliability margin
+            for throughput. 230400 is a conservative 2x step up,
+            validated by first setting the module's own UART speed to
+            match via `AT+IPR=230400` + `AT&W` (one-time, persists
+            across power cycles) before flashing firmware with this baud.
 
     choice MODEM_FLOW_CONTROL
         prompt "UART flow control"
         default MODEM_FLOW_CONTROL_NONE
         help
-            Datasheet: "Support MAIN_RTS & MAIN_CTS Hw flow control".
-            Leave at NONE unless you've wired RTS/CTS and are pushing the
-            baud rate up.
+            Always None on the Vanix TracX-1b -- HW flow control needs
+            MAIN_RTS/MAIN_CTS wired, which this carrier board's header
+            doesn't expose (datasheet Table 3). Software (XON/XOFF) flow
+            control isn't a safe substitute here either: PPP's data
+            stream is raw binary and will regularly contain byte values
+            that coincidentally match XON/XOFF control codes, causing
+            spurious flow interruptions mid-transfer.
 
         config MODEM_FLOW_CONTROL_NONE
             bool "None"
         config MODEM_FLOW_CONTROL_HW
-            bool "Hardware (RTS/CTS)"
+            bool "Hardware (RTS/CTS) -- not wireable on this board"
     endchoice
 
 endmenu

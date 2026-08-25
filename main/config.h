@@ -9,7 +9,10 @@
  *   TracX-1b Tx  -> ESP32-S3 UART Rx  (MODEM_UART_RX_GPIO)
  *   TracX-1b Rx  -> ESP32-S3 UART Tx  (MODEM_UART_TX_GPIO)
  *   TracX-1b GND -> ESP32-S3 GND
- *   Optional MAIN_RTS/MAIN_CTS for HW flow control at higher baud rates
+ *   No MAIN_RTS/MAIN_CTS wiring: the EC200U-CN chip supports HW flow
+ *   control, but this carrier board's Communications Pins header does
+ *   not expose those two pins (datasheet Table 3 lists only Tx/Rx/GND
+ *   under UART Pins) -- flow control stays at None regardless of baud.
  *   Carrier board VBAT <- dedicated >= 2 A, 3.7-4 V supply (jumper on
  *                          "BAT"), independent of the ESP32-S3 entirely
  *   Optional PWRKEY on GPIO4, optional RST on GPIO5
@@ -41,10 +44,15 @@ extern "C" {
 #define MODEM_UART_CTS_GPIO         CONFIG_MODEM_UART_CTS_PIN
 #define MODEM_UART_BAUD_RATE        CONFIG_MODEM_UART_BAUD_RATE
 
-/* Datasheet: UART default is 115200 bps, no flow control, and that's the
- * safest starting point for bring-up. Only switch CONFIG_MODEM_FLOW_CONTROL
- * to HW (and wire MAIN_RTS/MAIN_CTS) if you push the baud rate up toward
- * the module's 921600 bps ceiling. */
+/* Datasheet default is 115200 bps, no flow control. Raised to 230400 as
+ * a conservative 2x step for OTA throughput -- HW flow control isn't
+ * wireable on this carrier board (see above) and SW/XON-XOFF isn't safe
+ * over PPP's raw binary data stream, so there is no flow-controlled path
+ * to a higher baud here; this trades a little reliability margin for
+ * speed instead. The module's own UART speed must be changed to match
+ * via `AT+IPR=230400` + `AT&W` (one-time, persists in NVM) BEFORE
+ * flashing firmware built with this baud -- otherwise the two ends
+ * simply won't agree on a bit rate at all. */
 #if defined(CONFIG_MODEM_FLOW_CONTROL_NONE)
 #define MODEM_FLOW_CONTROL          ESP_MODEM_FLOW_CONTROL_NONE
 #elif defined(CONFIG_MODEM_FLOW_CONTROL_HW)
