@@ -78,11 +78,25 @@ extern "C" {
  *   - RST: low pulse >= 100 ms hard-resets the baseband. This is NOT a
  *     graceful shutdown (no detach/dereg) -- use PWRKEY/AT+QPOWD first
  *     and reserve RST for a genuinely wedged modem.
- * Values below add margin over each datasheet minimum. */
+ * ON/OFF pulse widths below add margin over each datasheet minimum (2s/3s).
+ * SETTLE_MS is different: the datasheet only says the module "executes
+ * power-down procedure after PWRKEY is released" with no bound on how long
+ * that takes. If the ON pulse below lands before shutdown has actually
+ * finished, the module can be left stuck powered-off -- observed in
+ * practice, not hypothetical. Generous on purpose since there's no spec
+ * value to size this against. */
 #define MODEM_PWRKEY_ON_PULSE_MS    2500
 #define MODEM_PWRKEY_OFF_PULSE_MS   3200
-#define MODEM_PWRKEY_SETTLE_MS      3000
+#define MODEM_PWRKEY_SETTLE_MS      8000
 #define MODEM_RST_PULSE_MS          150
+
+/* modem_install() polls AT+CGATT (network attachment) for up to this long
+ * before returning, so the first modem_ppp_start() dial lands after the
+ * modem has actually attached instead of racing it. LTE registration after
+ * a cold boot/reset commonly takes 10-30+ s -- dialing before that just
+ * burns a PPP retry cycle on a guaranteed failure. */
+#define MODEM_NET_ATTACH_TIMEOUT_MS 30000
+#define MODEM_NET_ATTACH_POLL_MS    1000
 
 #define PPP_CONNECT_TIMEOUT_MS      60000
 #define MAX_PPP_RETRIES             5

@@ -126,6 +126,32 @@ esp_err_t modem_install(const char *apn)
         ESP_LOGW(TAG, "get_signal_quality failed -- check UART wiring/baud");
     }
 
+    /* Don't dial PPP until the modem has actually attached to the network
+     * (AT+CGATT). Skipping this and dialing right after the fixed boot
+     * delay means the first attempt (and often several more) races LTE
+     * registration and fails every time -- not a wiring/signal problem,
+     * just bad timing. */
+    ESP_LOGI(TAG, "Waiting for network attachment (AT+CGATT) up to %d ms...",
+             MODEM_NET_ATTACH_TIMEOUT_MS);
+    int waited_ms = 0;
+    bool attached = false;
+    while (waited_ms < MODEM_NET_ATTACH_TIMEOUT_MS) {
+        int state = 0;
+        if (s_dce->get_network_attachment_state(state) == esp_modem::command_result::OK &&
+                state == 1) {
+            attached = true;
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(MODEM_NET_ATTACH_POLL_MS));
+        waited_ms += MODEM_NET_ATTACH_POLL_MS;
+    }
+    if (attached) {
+        ESP_LOGI(TAG, "Network attached after %d ms", waited_ms);
+    } else {
+        ESP_LOGW(TAG, "Network attachment timed out after %d ms -- dialing anyway",
+                 MODEM_NET_ATTACH_TIMEOUT_MS);
+    }
+
     return ESP_OK;
 }
 

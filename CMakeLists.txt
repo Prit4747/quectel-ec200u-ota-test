@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 # Bump for each release when generating delta OTA patches (tools/make_patch.py
 # diffs against the .bin matching the PROJECT_VER currently on the device).
-set(PROJECT_VER "v2.0.3-delta-test2")
+set(PROJECT_VER "v3.0.1-delta-test")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 

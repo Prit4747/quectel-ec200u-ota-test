@@ -8,7 +8,11 @@ Creates a .patch file in the format expected by esp_delta_ota / ota_manager.c:
   [detools sequential patch body, heatshrink-compressed]
 
 Usage:
-  python tools/make_patch.py --base build/delta_fota.bin --new build/v2.bin --out firmware/update.patch
+  python tools/make_patch.py --base firmware/full/<current-on-device>.bin \
+    --new firmware/full/<new-version>.bin --out firmware/delta/<new-version>.patch
+
+firmware/full/  -- every full-image .bin (also doubles as --base/--new input)
+firmware/delta/ -- every generated .patch, output only, never a make_patch.py input
 
 Requirements (IDF Python env):
   pip install detools esptool
