@@ -26,14 +26,20 @@ import struct
 import sys
 import tempfile
 
-# Prefer full detools checkout (tools/detools-src) then bundled copy.
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-for _detools_root in (
-    os.path.join(_SCRIPT_DIR, "detools-src"),
-    os.path.join(_SCRIPT_DIR, "..", "managed_components", "espressif__esp_delta_ota", "detools"),
-):
-    if os.path.isdir(_detools_root) and _detools_root not in sys.path:
-        sys.path.insert(0, _detools_root)
+# Prefer a pip-installed detools (has the compiled bsdiff extension). Only
+# fall back to the bundled copy under managed_components/ -- vendored for
+# the on-device C component, source-only, missing detools.bsdiff -- if pip's
+# isn't available.
+try:
+    import detools  # noqa: F401
+except ImportError:
+    _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    for _detools_root in (
+        os.path.join(_SCRIPT_DIR, "detools-src"),
+        os.path.join(_SCRIPT_DIR, "..", "managed_components", "espressif__esp_delta_ota", "detools"),
+    ):
+        if os.path.isdir(_detools_root) and _detools_root not in sys.path:
+            sys.path.insert(0, _detools_root)
 
 MAGIC = 0xFCCDDE10
 MAGIC_SIZE = 4

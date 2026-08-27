@@ -112,10 +112,27 @@ static esp_err_t run_full_ota(const char *url)
     esp_https_ota_config_t ota_cfg = {};
     ota_cfg.http_config = &http_cfg;
 
+    /* DNS/connect over cellular is flaky enough (EAI_FAIL from a dropped
+     * DNS round-trip, transient PPP hiccups) that a single failed attempt
+     * here shouldn't abort the whole OTA -- retry the connect a few times
+     * before giving up. esp_https_ota_perform() failures further down are
+     * not retried here; a corrupt/aborted image download is a different
+     * failure class from "couldn't even open the connection". */
     esp_https_ota_handle_t handle = NULL;
-    esp_err_t err = esp_https_ota_begin(&ota_cfg, &handle);
+    esp_err_t err = ESP_FAIL;
+    const int kConnectRetries = 3;
+    for (int attempt = 1; attempt <= kConnectRetries; attempt++) {
+        err = esp_https_ota_begin(&ota_cfg, &handle);
+        if (err == ESP_OK) {
+            break;
+        }
+        ota_log("esp_https_ota_begin failed (attempt %d/%d): %s",
+                attempt, kConnectRetries, esp_err_to_name(err));
+        if (attempt < kConnectRetries) {
+            vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+    }
     if (err != ESP_OK) {
-        ota_log("esp_https_ota_begin failed: %s", esp_err_to_name(err));
         return err;
     }
 
