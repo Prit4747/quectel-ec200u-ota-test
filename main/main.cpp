@@ -127,6 +127,7 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "  Transport: UART PPPoS via esp_modem_* APIs");
     ESP_LOGI(TAG, "=================================================");
     ESP_LOGI(TAG, ">>> OTA-TEST-MARKER: this firmware was installed via OTA update <<<");
+    ESP_LOGI(TAG, ">>> BUILD MARKER: %s -- if you see this, the OTA update worked <<<", s_fw);
 
     esp_err_t nvs_err = nvs_flash_init();
     if (nvs_err == ESP_ERR_NVS_NO_FREE_PAGES ||
