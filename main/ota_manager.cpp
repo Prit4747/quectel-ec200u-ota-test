@@ -399,7 +399,31 @@ static esp_err_t run_delta_ota(const char *url)
     int last_pct   = -1;
     uint8_t buf[1024];
 
-    err = http_open_following_redirects(client, &content_len);
+    /* DNS/connect over cellular is flaky enough (transient PPP hiccups,
+     * a dropped TLS handshake) that a single failed attempt here shouldn't
+     * abort the whole delta OTA -- retry the connect a few times before
+     * giving up, matching run_full_ota()'s esp_https_ota_begin retry loop.
+     * Without this, delta OTA had no cushion at all against exactly the
+     * kind of transient connect failure full OTA already tolerated, which
+     * is why full OTA could succeed and an immediately-following delta OTA
+     * attempt could fail on what was likely the same class of hiccup.
+     * esp_http_client_set_redirection() (inside http_open_following_redirects)
+     * updates the client's URL in place, so retrying just calls open() again
+     * against wherever the previous attempt left off -- no need to
+     * re-resolve the original URL from scratch each time. */
+    {
+        const int kConnectRetries = 3;
+        for (int attempt = 1; attempt <= kConnectRetries; attempt++) {
+            err = http_open_following_redirects(client, &content_len);
+            if (err == ESP_OK) {
+                break;
+            }
+            ota_log("connect failed (attempt %d/%d)", attempt, kConnectRetries);
+            if (attempt < kConnectRetries) {
+                vTaskDelay(pdMS_TO_TICKS(2000));
+            }
+        }
+    }
     if (err != ESP_OK) {
         goto cleanup;
     }
