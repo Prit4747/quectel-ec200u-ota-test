@@ -51,6 +51,20 @@ esp_err_t modem_ppp_stop(void);
  *  DCE is in COMMAND mode. */
 void modem_read_status(char *op_buf, size_t op_len, int *rssi_out);
 
+/**
+ * @brief One-shot AT+IPR=<baud> + AT&W: persist a new UART baud rate on the
+ *        module's own NVM, at whatever baud it's CURRENTLY talking at.
+ *
+ * Call only while the DCE is installed and in COMMAND mode, communicating
+ * at the module's existing baud (i.e. before you change MODEM_UART_BAUD_RATE
+ * and reflash). The module starts honoring the new baud immediately once
+ * AT&W completes -- this ESP32-side DCE will then be unable to talk to it
+ * until firmware is rebuilt with a matching MODEM_UART_BAUD_RATE and
+ * reflashed. This is a deliberate one-way migration step, not something to
+ * call routinely.
+ */
+esp_err_t modem_set_uart_baud_persist(int new_baud);
+
 /** Best-effort AT+CFUN=1,1 reboot of the modem's baseband. Deliberately
  *  sent as a raw AT command (esp_modem_at()) rather than esp_modem's own
  *  esp_modem_reset() -- that generic command sends SIMCom-specific

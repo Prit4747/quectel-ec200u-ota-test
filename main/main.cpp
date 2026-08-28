@@ -210,6 +210,20 @@ extern "C" void app_main(void)
             continue;
         }
 
+        if (web_server_baud_migrate_requested()) {
+            if (!modem_is_installed()) {
+                push_log("BAUD: migrate requested but modem not installed -- retry once online");
+            } else {
+                push_log("BAUD: sending AT+IPR=115200 + AT&W to modem...");
+                if (modem_set_uart_baud_persist(115200) == ESP_OK) {
+                    push_log("BAUD: modem now saved at 115200 -- rebuild+reflash "
+                             "with MODEM_UART_BAUD_RATE=115200, this session is now stale");
+                } else {
+                    push_log("BAUD: migration FAILED -- modem still at its old baud, safe to retry");
+                }
+            }
+        }
+
         if (ota_manager_get_state() == OTA_STATE_RUNNING) {
             continue;
         }

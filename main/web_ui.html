@@ -57,7 +57,10 @@
   </div>
   <div style="margin-top:10px">
     <button class="btn btn-secondary" onclick="retryModem()" id="btn-retry">Retry modem</button>
+    <button class="btn btn-secondary" onclick="migrateBaud()" id="btn-migrate-baud">Migrate UART baud &rarr; 115200</button>
   </div>
+  <div class="hint">One-shot: only use this while running a firmware build whose MODEM_UART_BAUD_RATE
+    still matches the modem's CURRENT saved baud. After it succeeds, reflash with MODEM_UART_BAUD_RATE=115200.</div>
 </div>
 
 <div class="card">
@@ -142,6 +145,15 @@ function updateStatus(d){
 function retryModem(){
   fetch('/modem/retry',{method:'POST'})
     .then(()=>log('SYS: Modem retry requested','log-sys'))
+    .catch(()=>log('SYS: Request failed','log-err'));
+}
+
+function migrateBaud(){
+  if(!confirm('This persists a new UART baud on the modem itself (AT+IPR + AT&W). '+
+              'Only do this if the CURRENT firmware build matches the baud the modem is already saved at. '+
+              'After this succeeds, you must reflash with the new baud before reconnecting. Continue?')) return;
+  fetch('/modem/migrate_baud',{method:'POST'})
+    .then(()=>log('SYS: Baud migration requested -- watch the log below','log-sys'))
     .catch(()=>log('SYS: Request failed','log-err'));
 }
 

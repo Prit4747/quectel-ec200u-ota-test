@@ -10,6 +10,7 @@
  *   GET  /events     -> SSE stream (log, progress, reboot events)
  *   POST /ota/start  -> {"url":"..."} -- triggers OTA
  *   POST /modem/retry-> requests modem reconnect
+ *   POST /modem/migrate_baud -> one-shot AT+IPR+AT&W baud persist (see modem.h)
  *
  * SSE note: the /events handler returns immediately after recording the
  * client socket. Events are pushed later from other tasks with
@@ -74,6 +75,7 @@ static SemaphoreHandle_t s_sse_mux;
 static int  s_sse_fd[MAX_SSE_CLIENTS];   /* -1 = free slot */
 
 static volatile bool s_retry_requested = false;
+static volatile bool s_baud_migrate_requested = false;
 
 /* ------------------------------------------------------------------ */
 /*  SSE: push one event to every connected client                       */
@@ -135,6 +137,13 @@ bool web_server_retry_requested(void)
 {
     bool v = s_retry_requested;
     s_retry_requested = false;
+    return v;
+}
+
+bool web_server_baud_migrate_requested(void)
+{
+    bool v = s_baud_migrate_requested;
+    s_baud_migrate_requested = false;
     return v;
 }
 
@@ -252,6 +261,16 @@ static esp_err_t h_modem_retry(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+/* One-shot UART baud-persist migration -- see modem_set_uart_baud_persist().
+ * Deliberately a separate button/endpoint from /modem/retry: this is a
+ * one-way action (AT+IPR + AT&W on the module's NVM), not a routine one. */
+static esp_err_t h_modem_migrate_baud(httpd_req_t *req)
+{
+    s_baud_migrate_requested = true;
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
 /* Drop the SSE slot when the browser closes the tab. */
 static void on_sess_close(httpd_handle_t hd, int sockfd)
 {
@@ -326,12 +345,13 @@ esp_err_t web_server_start(void)
         return err;
     }
 
-    httpd_uri_t uris[5] = {};
-    uris[0].uri = "/";            uris[0].method = HTTP_GET;  uris[0].handler = h_root;
-    uris[1].uri = "/status";      uris[1].method = HTTP_GET;  uris[1].handler = h_status;
-    uris[2].uri = "/events";      uris[2].method = HTTP_GET;  uris[2].handler = h_events;
-    uris[3].uri = "/ota/start";   uris[3].method = HTTP_POST; uris[3].handler = h_ota_start;
-    uris[4].uri = "/modem/retry"; uris[4].method = HTTP_POST; uris[4].handler = h_modem_retry;
+    httpd_uri_t uris[6] = {};
+    uris[0].uri = "/";                  uris[0].method = HTTP_GET;  uris[0].handler = h_root;
+    uris[1].uri = "/status";            uris[1].method = HTTP_GET;  uris[1].handler = h_status;
+    uris[2].uri = "/events";            uris[2].method = HTTP_GET;  uris[2].handler = h_events;
+    uris[3].uri = "/ota/start";         uris[3].method = HTTP_POST; uris[3].handler = h_ota_start;
+    uris[4].uri = "/modem/retry";       uris[4].method = HTTP_POST; uris[4].handler = h_modem_retry;
+    uris[5].uri = "/modem/migrate_baud"; uris[5].method = HTTP_POST; uris[5].handler = h_modem_migrate_baud;
 
     for (int i = 0; i < (int)(sizeof(uris) / sizeof(uris[0])); i++) {
         httpd_register_uri_handler(s_server, &uris[i]);

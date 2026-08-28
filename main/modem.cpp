@@ -264,6 +264,36 @@ esp_err_t modem_hard_reset(void)
     return ESP_OK;
 }
 
+esp_err_t modem_set_uart_baud_persist(int new_baud)
+{
+    if (!s_dce) {
+        ESP_LOGW(TAG, "modem_set_uart_baud_persist: no DCE installed, skipping");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    char cmd[32];
+    snprintf(cmd, sizeof(cmd), "AT+IPR=%d", new_baud);
+
+    ESP_LOGW(TAG, "Persisting modem UART baud -> %d (AT+IPR, then AT&W)", new_baud);
+    std::string out;
+    auto res = s_dce->at(cmd, out, 5000);
+    if (res != esp_modem::command_result::OK) {
+        ESP_LOGE(TAG, "%s failed (result=%d) -- baud NOT changed", cmd, (int)res);
+        return ESP_FAIL;
+    }
+
+    res = s_dce->at("AT&W", out, 5000);
+    if (res != esp_modem::command_result::OK) {
+        ESP_LOGE(TAG, "AT&W failed (result=%d) -- new baud may not survive a power cycle", (int)res);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGW(TAG, "Modem now talking at %d baud (saved to NVM) -- "
+             "this ESP32-side session is now stale; rebuild+reflash with "
+             "MODEM_UART_BAUD_RATE=%d before the next reconnect", new_baud, new_baud);
+    return ESP_OK;
+}
+
 esp_err_t modem_force_reset(void)
 {
     if (!s_dce) {

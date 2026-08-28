@@ -51,15 +51,22 @@ menu "Modem / Quectel EC200U-CN UART Configuration"
 
     config MODEM_UART_BAUD_RATE
         int "UART baud rate"
-        default 230400
+        default 115200
         help
-            Datasheet default is 115200 bps. Since this carrier board
-            doesn't expose MAIN_RTS/MAIN_CTS (HW flow control is not an
-            option here), raising this trades some reliability margin
-            for throughput. 230400 is a conservative 2x step up,
-            validated by first setting the module's own UART speed to
-            match via `AT+IPR=230400` + `AT&W` (one-time, persists
-            across power cycles) before flashing firmware with this baud.
+            Datasheet default is 115200 bps. This carrier board doesn't
+            expose MAIN_RTS/MAIN_CTS (HW flow control is not an option
+            here), so there's no flow-controlled path to a higher baud --
+            230400 was tried and reverted after sustained UART_BREAK/framing
+            errors showed up under real-world wiring (breadboard jumpers,
+            no shielding), corrupting PPP traffic and stalling OTA
+            connects. Only raise this again alongside a genuinely more
+            robust physical link (shorter/twisted-pair wiring, solid
+            shared ground). Changing this value requires first setting the
+            module's own saved UART speed to match via `AT+IPR=<rate>` +
+            `AT&W` (one-time, persists across power cycles) BEFORE
+            flashing firmware built with the new rate -- see
+            modem_set_uart_baud_persist() / the web UI's "Migrate UART
+            baud" button.
 
     choice MODEM_FLOW_CONTROL
         prompt "UART flow control"

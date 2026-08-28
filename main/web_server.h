@@ -29,6 +29,12 @@ void web_server_push_event(const char *json_event);
 bool web_server_retry_requested(void);
 
 /**
+ * @brief Returns true (once) if the web UI requested the one-shot UART
+ *        baud-persist migration (see modem_set_uart_baud_persist()).
+ */
+bool web_server_baud_migrate_requested(void);
+
+/**
  * @brief Update the status fields shown on the web UI.
  */
 void web_server_set_status(const char *fw_version,
