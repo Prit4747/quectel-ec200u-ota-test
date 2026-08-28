@@ -75,6 +75,19 @@ static void refresh_ppp_ip(void)
     }
 }
 
+/* Registered with ota_manager as its pre-reboot hook (see ota_manager.h) --
+ * called right before esp_restart() on a successful OTA. The modem runs on
+ * its own independent power supply and does not reset with the ESP32, so
+ * without this it can be left mid-PPP-session (DATA mode) across the
+ * reboot, confusing the fresh esp_modem session that starts up afterward. */
+static void modem_hangup_before_reboot(void)
+{
+    if (modem_is_installed()) {
+        push_log("OTA: returning modem to command mode (hang up PPP) before reboot");
+        modem_ppp_stop();
+    }
+}
+
 static bool ppp_bring_up(void)
 {
     for (int attempt = 1; attempt <= MAX_PPP_RETRIES; attempt++) {
@@ -142,6 +155,7 @@ extern "C" void app_main(void)
 
     ESP_ERROR_CHECK(web_server_start());
     ota_manager_init();
+    ota_manager_set_pre_reboot_hook(modem_hangup_before_reboot);
     ESP_ERROR_CHECK(ppp_manager_init_events());
 
     web_server_set_status(s_fw, AP_NAME, 1, "-", "-", 0);

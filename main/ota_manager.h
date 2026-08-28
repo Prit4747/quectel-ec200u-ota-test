@@ -37,6 +37,23 @@ esp_err_t ota_manager_start(const char *url);
  */
 ota_state_t ota_manager_get_state(void);
 
+/**
+ * @brief Register a callback fired right before the post-OTA esp_restart().
+ *
+ * ota_manager never touches the modem/PPP transport directly (see the file
+ * header comment in ota_manager.cpp) -- this hook is the extension point for
+ * whatever transport layer is in use to do so. On this project it's used to
+ * return the modem to COMMAND mode before the ESP32 reboots: the modem has
+ * its own independent power supply and does NOT reset alongside the ESP32,
+ * so if it's left in DATA mode (still PPP-dialed) at reboot, the freshly
+ * booted esp_modem session's first AT probe can be swallowed/misread,
+ * costing a full retry cycle before the modem is usable again.
+ *
+ * Optional: if never set, the pre-restart hook is simply skipped.
+ */
+typedef void (*ota_pre_reboot_hook_t)(void);
+void ota_manager_set_pre_reboot_hook(ota_pre_reboot_hook_t hook);
+
 #ifdef __cplusplus
 }
 #endif

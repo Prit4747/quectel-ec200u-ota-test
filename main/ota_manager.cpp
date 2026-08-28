@@ -48,6 +48,7 @@ static const char *TAG = "OTA";
 
 static volatile ota_state_t s_state = OTA_STATE_IDLE;
 static char s_url[512];
+static ota_pre_reboot_hook_t s_pre_reboot_hook = nullptr;
 
 /* ------------------------------------------------------------------ */
 
@@ -71,6 +72,26 @@ static void ota_progress(int pct, const char *label)
     snprintf(event, sizeof(event),
              "{\"type\":\"progress\",\"pct\":%d,\"label\":\"%s\"}", pct, label);
     web_server_push_event(event);
+}
+
+/* Reporting every 1% change pushes ~100 SSE sends (each a blocking socket
+ * write over the WiFi AP) over the course of a single OTA transfer, all
+ * from ota_task while it's also driving the HTTPS/TLS read loop -- that
+ * competes for CPU with the modem's UART relay task right when it can
+ * least afford it, contributing to the UART_FIFO_OVF ("HW FIFO Overflow")
+ * warnings seen under sustained OTA load. Bucketing to 5% steps cuts that
+ * by ~5x while still giving smooth-looking web UI progress. 100% is always
+ * reported so the "Done" transition never gets skipped by the bucketing. */
+#define OTA_PROGRESS_STEP_PCT 5
+
+static bool progress_step_changed(int pct, int *last_reported)
+{
+    int bucket = (pct >= 100) ? 100 : (pct / OTA_PROGRESS_STEP_PCT) * OTA_PROGRESS_STEP_PCT;
+    if (bucket == *last_reported) {
+        return false;
+    }
+    *last_reported = bucket;
+    return true;
 }
 
 static bool url_is_delta_patch(const char *url)
@@ -152,11 +173,10 @@ static esp_err_t run_full_ota(const char *url)
         int total     = esp_https_ota_get_image_size(handle);
         if (total > 0) {
             int pct = (image_len * 100) / total;
-            if (pct != last_pct) {
-                last_pct = pct;
+            if (progress_step_changed(pct, &last_pct)) {
                 char lbl[32];
                 snprintf(lbl, sizeof(lbl), "%d / %d KB", image_len / 1024, total / 1024);
-                ota_progress(pct, lbl);
+                ota_progress(last_pct, lbl);
             }
         }
     }
@@ -422,11 +442,10 @@ static esp_err_t run_delta_ota(const char *url)
 
         if (body_total > 0) {
             int pct = (body_read * 100) / body_total;
-            if (pct != last_pct) {
-                last_pct = pct;
+            if (progress_step_changed(pct, &last_pct)) {
                 char lbl[32];
                 snprintf(lbl, sizeof(lbl), "%d / %d KB", body_read / 1024, body_total / 1024);
-                ota_progress(pct, lbl);
+                ota_progress(last_pct, lbl);
             }
         }
     }
@@ -477,6 +496,19 @@ static void ota_task(void *arg)
 
     if (err == ESP_OK) {
         s_state = OTA_STATE_DONE;
+
+        /* The modem has its own independent power supply and does not
+         * reset alongside the ESP32 -- if left in DATA mode (still
+         * PPP-dialed) across the reboot below, the fresh esp_modem session
+         * on the other side can have its first AT probe swallowed/misread
+         * as PPP payload, costing a full retry cycle before the modem is
+         * usable again post-OTA. Best-effort: OTA has already succeeded at
+         * this point regardless of whether this hook does anything useful. */
+        if (s_pre_reboot_hook) {
+            ota_log("Returning modem to command mode before reboot...");
+            s_pre_reboot_hook();
+        }
+
         web_server_push_event("{\"type\":\"reboot\",\"secs\":3}");
         vTaskDelay(pdMS_TO_TICKS(3000));
         esp_restart();
@@ -522,4 +554,9 @@ esp_err_t ota_manager_start(const char *url)
 ota_state_t ota_manager_get_state(void)
 {
     return s_state;
+}
+
+void ota_manager_set_pre_reboot_hook(ota_pre_reboot_hook_t hook)
+{
+    s_pre_reboot_hook = hook;
 }
